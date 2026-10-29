@@ -14,8 +14,8 @@ export function Hero() {
   // Fase 1: título sobe e some; logo cresce até o centro.
   const titleY = useTransform(p, [0, 0.3], [0, -120]);
   const titleOpacity = useTransform(p, [0, 0.25], [1, 0]);
-  const logoScale = useTransform(p, [0, 0.35, 0.6], [1, 1.35, 0.55]);
-  const logoY = useTransform(p, [0, 0.35, 0.6], ["0vh", "-6vh", "-22vh"]);
+  const logoScale = useTransform(p, [0, 0.35, 0.6], [1, 1.2, 0.75]);
+  const logoY = useTransform(p, [0, 0.35, 0.6], ["0vh", "-4vh", "-38vh"]);
   const logoRotate = useTransform(p, [0, 0.6], [0, -12]);
 
   // Fase 2: o terracota da logo "transborda" e toma a tela.
@@ -64,7 +64,7 @@ export function Hero() {
 
         <motion.div
           style={{ scale: logoScale, y: logoY, rotate: logoRotate }}
-          className="relative z-10 mt-[22svh] w-[min(62vw,340px)]"
+          className="relative z-10 mt-[38svh] w-[min(46vw,250px)]"
         >
           <motion.div
             initial={{ opacity: 0, scale: 0.6, rotate: 20 }}

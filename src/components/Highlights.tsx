@@ -11,15 +11,23 @@ const STATS = [
   { value: "6", label: "sabores de assadinhos para montar o seu mix de festa." },
 ];
 
-function Photo({ src, alt, from, to }: { src: string; alt: string; from: number; to: number }) {
+type PhotoProps = { src: string; alt: string; width: number; height: number; maxWidth: number; from: number; to: number };
+
+/**
+ * As fotos disponíveis têm baixa resolução: exibimos na proporção original, sem zoom,
+ * e limitamos a largura para não ampliar além do que a imagem aguenta.
+ */
+function Photo({ src, alt, width, height, maxWidth, from, to }: PhotoProps) {
   const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
   const y = useTransform(scrollYProgress, [0, 1], [from, to]);
-  const scale = useTransform(scrollYProgress, [0, 0.5], [1.15, 1]);
   return (
-    <div ref={ref} className="relative aspect-[4/5] overflow-hidden rounded-[2rem] bg-cream-deep shadow-2xl shadow-terracotta/20">
-      <motion.div style={{ y, scale }} className="absolute inset-[-10%]">
-        <Image src={src} alt={alt} fill sizes="(min-width: 768px) 40vw, 90vw" className="object-cover" />
+    <div ref={ref} className="flex justify-center">
+      <motion.div
+        style={{ y, maxWidth }}
+        className="w-full overflow-hidden rounded-[2rem] bg-cream-deep shadow-2xl shadow-terracotta/20 ring-8 ring-white/60"
+      >
+        <Image src={src} alt={alt} width={width} height={height} unoptimized className="block h-auto w-full" />
       </motion.div>
     </div>
   );
@@ -39,7 +47,7 @@ export function Highlights() {
         </Reveal>
 
         <div className="mt-20 grid items-center gap-10 md:grid-cols-2 md:gap-16">
-          <Photo src="/img/pizza-enrolada.webp" alt="Salgado individual recheado com hambúrguer e cheddar derretido" from={-40} to={40} />
+          <Photo src="/img/pizza-enrolada.png" alt="Salgado individual recheado com hambúrguer e cheddar derretido" width={364} height={630} maxWidth={320} from={-30} to={30} />
           <div className="space-y-12">
             {STATS.map((s, i) => (
               <Reveal key={s.value} delay={i * 0.12}>
@@ -69,7 +77,7 @@ export function Highlights() {
             </a>
           </Reveal>
           <div className="order-1 md:order-2">
-            <Photo src="/img/assadinhos.webp" alt="Bandeja de assadinhos com gergelim" from={40} to={-40} />
+            <Photo src="/img/assadinhos.png" alt="Bandeja de assadinhos com gergelim" width={206} height={390} maxWidth={230} from={30} to={-30} />
           </div>
         </div>
       </div>
