@@ -6,6 +6,7 @@ import { weekAgenda, weekStartOf, type AgendaBatch } from "@/server/services/age
 import { addDays, minutesOf, todayIn, weekdayOf, WEEKDAYS_PT } from "@/server/domain/time";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { StatusBadge } from "@/components/admin/StatusBadge";
+import { ProductionTabs } from "@/components/admin/ProductionTabs";
 
 const HOUR_PX = 64;
 
@@ -43,7 +44,7 @@ function BatchCard({ b, compact }: { b: AgendaBatch; compact?: boolean }) {
 }
 
 export default async function Agenda({ searchParams }: PageProps<"/admin/agenda">) {
-  await requireSection("agenda");
+  const session = await requireSection("agenda");
   const store = await getStore();
   const sp = await searchParams;
   const today = todayIn(store.timezone);
@@ -59,9 +60,10 @@ export default async function Agenda({ searchParams }: PageProps<"/admin/agenda"
 
   return (
     <>
+      <ProductionTabs active="semana" date={ref} role={session.role} />
       <PageHeader
         title="Agenda da semana"
-        subtitle={`${label(start)} a ${label(addDays(start, 6))} · toque numa fornada para ver os pedidos`}
+        subtitle={`${label(start)} a ${label(addDays(start, 6))} · toque numa fornada para ver os pedidos, ou no dia para ajustar`}
         actions={
           <>
             <Link href={`/admin/agenda?semana=${addDays(start, -7)}`} className="btn-secondary px-3" aria-label="Semana anterior"><ChevronLeft className="size-4" /></Link>
@@ -76,10 +78,18 @@ export default async function Agenda({ searchParams }: PageProps<"/admin/agenda"
         <div className="grid min-w-[900px]" style={{ gridTemplateColumns: `56px repeat(7, minmax(0, 1fr))` }}>
           <div />
           {days.map((d) => (
-            <div key={d.date} className={`border-b border-l border-terracotta/10 p-2 text-center ${d.date === today ? "bg-amber/15" : ""}`}>
+            <Link
+              key={d.date}
+              href={`/admin/fornadas?data=${d.date}`}
+              title="Abrir o dia"
+              className={`border-b border-l border-terracotta/10 p-2 text-center transition hover:bg-terracotta/10 ${d.date === today ? "bg-amber/15" : ""}`}
+            >
               <p className="text-xs font-bold uppercase text-ink/50">{WEEKDAYS_PT[weekdayOf(d.date)].slice(0, 3)}</p>
               <p className="font-display text-lg font-bold">{label(d.date)}</p>
-            </div>
+              <p className="text-[11px] font-semibold text-terracotta">
+                {d.batches.reduce((n, b) => n + b.orders.length, 0)} pedido(s)
+              </p>
+            </Link>
           ))}
           <div className="relative" style={{ height: hours.length * HOUR_PX }}>
             {hours.map((h, i) => (
@@ -116,7 +126,10 @@ export default async function Agenda({ searchParams }: PageProps<"/admin/agenda"
       <div className="space-y-4 lg:hidden">
         {days.map((d) => (
           <section key={d.date} className={`card ${d.date === today ? "ring-2 ring-amber" : ""}`}>
-            <h2 className="mb-2 font-display text-lg font-bold">{WEEKDAYS_PT[weekdayOf(d.date)]} · {label(d.date)}</h2>
+            <h2 className="mb-2 flex items-center justify-between font-display text-lg font-bold">
+              {WEEKDAYS_PT[weekdayOf(d.date)]} · {label(d.date)}
+              <Link href={`/admin/fornadas?data=${d.date}`} className="btn-ghost text-sm">Abrir dia</Link>
+            </h2>
             {d.batches.length === 0 ? (
               <p className="text-sm text-ink/50">Sem fornadas.</p>
             ) : (

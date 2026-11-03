@@ -23,8 +23,8 @@ npm run db:seed               # loja, cardápio da Evy, horários, plano de forn
 npm run dev
 ```
 
-- Loja: http://localhost:3000
-- Painel: http://localhost:3000/admin — usuário criado pelo seed: `evy@assadosdaevy.com.br`, senha `trocar123`. **Troque a senha em Configurações** no primeiro acesso.
+- Loja: http://localhost:3010
+- Painel: http://localhost:3010/admin — usuário criado pelo seed: `evy@assadosdaevy.com.br`, senha `trocar123`. **Troque a senha em Configurações** no primeiro acesso.
 
 ## Testes
 

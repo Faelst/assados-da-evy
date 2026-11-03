@@ -14,12 +14,15 @@ export function PlanEditor({
   products,
   hours,
   plan,
+  initialWeekday,
 }: {
   products: Product[];
   hours: { weekday: number; opensAt: string; closesAt: string }[];
   plan: { weekday: number; productId: string; startTime: string }[];
+  initialWeekday?: number;
 }) {
   const [weekday, setWeekday] = useState(() => {
+    if (initialWeekday !== undefined) return initialWeekday;
     const first = [1, 2, 3, 4, 5, 6, 0].find((d) => hours.some((h) => h.weekday === d));
     return first ?? 1;
   });
@@ -51,7 +54,7 @@ export function PlanEditor({
           kind: "ok",
           text: r.conflicts
             ? `Plano salvo. Atenção: ${r.conflicts} fornada(s) já vendida(s) saíram do plano e foram mantidas. Veja em Fornadas por data.`
-            : "Plano salvo. As próximas datas já foram atualizadas.",
+            : "Plano salvo. As próximas datas já foram atualizadas na agenda.",
         });
       } else {
         setErrors(Object.fromEntries(r.errors.map((e) => [e.index, e.code === "OVERLAP" ? "Sobrepõe outra fornada" : "Fora do horário da cozinha"])));

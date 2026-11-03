@@ -15,6 +15,7 @@ export async function verifyCredentials(email: string, password: string): Promis
 
 export type Section =
   | "dashboard"
+  | "cozinha"
   | "pedidos"
   | "agenda"
   | "producao"
@@ -31,8 +32,8 @@ export type Section =
 
 const ACCESS: Record<Role, Section[] | "all"> = {
   OWNER: "all",
-  ATTENDANT: ["dashboard", "pedidos", "agenda", "producao", "cardapio-do-dia", "clientes"],
-  KITCHEN: ["pedidos", "agenda", "producao"],
+  ATTENDANT: ["dashboard", "cozinha", "pedidos", "agenda", "producao", "cardapio-do-dia", "clientes"],
+  KITCHEN: ["cozinha", "pedidos", "agenda", "producao"],
 };
 
 export function can(role: Role, section: Section): boolean {

@@ -3,10 +3,16 @@ import { requireSection } from "@/server/auth";
 import { getStore } from "@/server/store";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { PlanEditor } from "@/components/admin/PlanEditor";
+import { ProductionTabs } from "@/components/admin/ProductionTabs";
+import { todayIn } from "@/server/domain/time";
 
-export default async function PlanoDeFornadas() {
-  await requireSection("plano-de-fornadas");
+export default async function PlanoDeFornadas({ searchParams }: PageProps<"/admin/plano-de-fornadas">) {
+  const session = await requireSection("plano-de-fornadas");
   const store = await getStore();
+  const sp = await searchParams;
+  const date = typeof sp.data === "string" && /^\d{4}-\d{2}-\d{2}$/.test(sp.data) ? sp.data : todayIn(store.timezone);
+  const dia = Number(sp.dia);
+  const initialWeekday = Number.isInteger(dia) && dia >= 0 && dia <= 6 ? dia : undefined;
   const [products, hours, plan] = await Promise.all([
     db.product.findMany({
       where: { storeId: store.id, active: true, saleModes: { has: "SCHEDULED" } },
@@ -18,14 +24,16 @@ export default async function PlanoDeFornadas() {
   ]);
   return (
     <>
+      <ProductionTabs active="plano" date={date} role={session.role} />
       <PageHeader
-        title="Plano de fornadas"
+        title="Plano semanal de fornadas"
         subtitle={`Monte cada dia da semana: qual receita entra no forno e a que horas. A cozinha faz ${store.parallelBatches} fornada(s) ao mesmo tempo (mude em Configurações).`}
       />
       <PlanEditor
         products={products}
         hours={hours.map((h) => ({ weekday: h.weekday, opensAt: h.opensAt, closesAt: h.closesAt }))}
         plan={plan.map((p) => ({ weekday: p.weekday, productId: p.productId, startTime: p.startTime }))}
+        initialWeekday={initialWeekday}
       />
     </>
   );

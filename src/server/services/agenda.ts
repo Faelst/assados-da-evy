@@ -22,7 +22,9 @@ export type AgendaOrder = {
 };
 export type AgendaBatch = {
   id: string;
+  productId: string;
   productName: string;
+  manual: boolean;
   start: string;
   end: string;
   usedUnits: number;
@@ -34,8 +36,16 @@ export type AgendaBatch = {
 export type AgendaDay = { date: LocalDate; batches: AgendaBatch[] };
 
 export async function weekAgenda(storeId: string, weekStart: LocalDate): Promise<AgendaDay[]> {
+  return agendaRange(storeId, weekStart, 7);
+}
+
+export async function dayAgenda(storeId: string, date: LocalDate): Promise<AgendaDay> {
+  return (await agendaRange(storeId, date, 1))[0];
+}
+
+async function agendaRange(storeId: string, weekStart: LocalDate, days: number): Promise<AgendaDay[]> {
   const store = await db.store.findUniqueOrThrow({ where: { id: storeId } });
-  const end = addDays(weekStart, 6);
+  const end = addDays(weekStart, days - 1);
   await ensureBatches(storeId, weekStart, end);
   const batches = await db.productionBatch.findMany({
     where: { storeId, date: { gte: dateColumn(weekStart), lte: dateColumn(end) } },
@@ -46,9 +56,9 @@ export async function weekAgenda(storeId: string, weekStart: LocalDate): Promise
     orderBy: { startsAt: "asc" },
   });
 
-  const days: AgendaDay[] = Array.from({ length: 7 }, (_, i) => ({ date: addDays(weekStart, i), batches: [] }));
+  const out: AgendaDay[] = Array.from({ length: days }, (_, i) => ({ date: addDays(weekStart, i), batches: [] }));
   for (const b of batches) {
-    const day = days.find((d) => d.date === fromDateColumn(b.date));
+    const day = out.find((d) => d.date === fromDateColumn(b.date));
     if (!day) continue;
     const byOrder = new Map<string, AgendaOrder>();
     for (const a of b.orderItems) {
@@ -74,7 +84,9 @@ export async function weekAgenda(storeId: string, weekStart: LocalDate): Promise
     }
     day.batches.push({
       id: b.id,
+      productId: b.productId,
       productName: b.product.name,
+      manual: b.manual,
       start: utcToLocalHHmm(b.startsAt, store.timezone),
       end: utcToLocalHHmm(b.readyAt, store.timezone),
       usedUnits: b.usedUnits,
@@ -84,7 +96,7 @@ export async function weekAgenda(storeId: string, weekStart: LocalDate): Promise
       orders: [...byOrder.values()],
     });
   }
-  return days;
+  return out;
 }
 
 export type ProductionLine = {

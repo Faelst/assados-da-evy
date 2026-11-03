@@ -8,7 +8,7 @@ import { NewOrdersWatcher } from "@/components/admin/NewOrdersWatcher";
 export const metadata = { title: "Painel — Assados da Evy", robots: { index: false } };
 
 const SECTIONS: Section[] = [
-  "dashboard", "pedidos", "agenda", "producao", "cardapio-do-dia", "receitas", "plano-de-fornadas",
+  "dashboard", "cozinha", "pedidos", "agenda", "producao", "cardapio-do-dia", "receitas", "plano-de-fornadas",
   "fornadas", "horarios", "excecoes", "entrega", "pagamento", "clientes", "configuracoes",
 ];
 const ROLE_LABEL = { OWNER: "Dono", ATTENDANT: "Atendente", KITCHEN: "Cozinha" } as const;

@@ -3,7 +3,7 @@ import { db } from "@/server/db";
 import { ensureBatches } from "@/server/services/batches";
 import { holdBooking } from "@/server/services/booking";
 import { createOrder, changeStatus } from "@/server/services/orders";
-import { weekAgenda, productionDay, weekStartOf } from "@/server/services/agenda";
+import { weekAgenda, productionDay, weekStartOf, dayAgenda } from "@/server/services/agenda";
 import { resetDb, seedStore, seedProduct, seedHours } from "../setup-db";
 
 const NOW = new Date("2026-11-03T13:00:00Z");
@@ -69,5 +69,15 @@ describe("agenda semanal", () => {
     expect(p).toEqual([
       { productId: panetone, productName: "Panetone", totalUnits: 3, batches: [{ start: "08:00", ready: "11:00", units: 3 }] },
     ]);
+  });
+
+  it("agenda de um dia traz as fornadas com os pedidos", async () => {
+    const day = await dayAgenda(storeId, MONDAY);
+    expect(day.date).toBe(MONDAY);
+    expect(day.batches.map((b) => [b.start, b.usedUnits, b.orders.length])).toEqual([
+      ["08:00", 3, 1],
+      ["11:00", 0, 0],
+    ]);
+    expect(day.batches[0]).toMatchObject({ manual: false, productId: panetone });
   });
 });

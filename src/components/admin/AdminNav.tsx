@@ -5,20 +5,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
-  CalendarClock, CalendarDays, CalendarX, ChefHat, ClipboardList, Clock, CookingPot, CreditCard, LayoutDashboard,
-  ListChecks, LogOut, Menu, Settings, ShoppingBasket, Truck, Users, X,
+  CalendarDays, CalendarX, ChefHat, ClipboardList, Clock, CookingPot, CreditCard, LayoutDashboard,
+  LogOut, Menu, MonitorPlay, Settings, ShoppingBasket, Truck, Users, X,
 } from "lucide-react";
 import { logoutAction } from "@/app/admin/login/actions";
 
 const ITEMS = [
   { section: "dashboard", href: "/admin", label: "Início", icon: LayoutDashboard },
+  { section: "cozinha", href: "/admin/cozinha", label: "Cozinha ao vivo", icon: MonitorPlay },
   { section: "pedidos", href: "/admin/pedidos", label: "Pedidos", icon: ClipboardList },
-  { section: "agenda", href: "/admin/agenda", label: "Agenda da semana", icon: CalendarDays },
+  { section: "agenda", href: "/admin/agenda", label: "Agenda e fornadas", icon: CalendarDays },
   { section: "producao", href: "/admin/producao", label: "Produção do dia", icon: ChefHat },
   { section: "cardapio-do-dia", href: "/admin/cardapio-do-dia", label: "Pronta entrega", icon: ShoppingBasket },
   { section: "receitas", href: "/admin/receitas", label: "Receitas", icon: CookingPot },
-  { section: "plano-de-fornadas", href: "/admin/plano-de-fornadas", label: "Plano de fornadas", icon: ListChecks },
-  { section: "fornadas", href: "/admin/fornadas", label: "Fornadas por data", icon: CalendarClock },
   { section: "horarios", href: "/admin/horarios", label: "Horários", icon: Clock },
   { section: "excecoes", href: "/admin/excecoes", label: "Feriados e exceções", icon: CalendarX },
   { section: "entrega", href: "/admin/entrega", label: "Entrega", icon: Truck },
@@ -31,7 +30,13 @@ export function AdminNav({ allowed, userName, role }: { allowed: string[]; userN
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const items = ITEMS.filter((i) => allowed.includes(i.section));
-  const isActive = (href: string) => (href === "/admin" ? pathname === "/admin" : pathname.startsWith(href));
+  const PRODUCTION = ["/admin/agenda", "/admin/fornadas", "/admin/plano-de-fornadas"];
+  const isActive = (href: string) =>
+    href === "/admin"
+      ? pathname === "/admin"
+      : href === "/admin/agenda"
+        ? PRODUCTION.some((p) => pathname.startsWith(p))
+        : pathname.startsWith(href);
 
   const list = (
     <nav className="flex h-full flex-col gap-1 p-3">
