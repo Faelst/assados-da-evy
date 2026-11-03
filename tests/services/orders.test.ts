@@ -31,7 +31,7 @@ describe("pedidos", () => {
 
   beforeEach(async () => {
     await resetDb();
-    storeId = (await seedStore()).id;
+    storeId = (await seedStore({ deliveryPricing: "ZONES" })).id;
     coxinha = (await seedProduct(storeId, { name: "Coxinha", saleModes: ["READY"], priceCents: 800 })).id;
     await seedHours(storeId);
     await upsertDailyMenu(storeId, TODAY, [{ productId: coxinha, qty: 5 }], null);

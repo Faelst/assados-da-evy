@@ -9,7 +9,7 @@ import { isValidName, isValidPhone, onlyDigits } from "@/lib/phone";
 import { BookingError, consumeHolds } from "./booking";
 import { releaseExpiredHolds } from "./batches";
 import { getStoreStatus } from "./calendar";
-import { quoteDelivery } from "./delivery";
+import { findValidQuote, quoteDelivery } from "./delivery";
 import { StockError, decrementForSale, restoreForCancel } from "./stock";
 
 export type OrderErrorCode =
@@ -22,7 +22,8 @@ export type OrderErrorCode =
   | "FULFILLMENT_DISABLED"
   | "PAYMENT_DISABLED"
   | "NOT_FOUND"
-  | "INVALID_TRANSITION";
+  | "INVALID_TRANSITION"
+  | "QUOTE_EXPIRED";
 
 export class OrderError extends Error {
   constructor(public code: OrderErrorCode) {
@@ -42,6 +43,7 @@ export const ORDER_ERROR_MESSAGE: Record<OrderErrorCode, string> = {
   PAYMENT_DISABLED: "Essa forma de pagamento não está disponível.",
   NOT_FOUND: "Pedido não encontrado.",
   INVALID_TRANSITION: "Essa mudança de status não é permitida.",
+  QUOTE_EXPIRED: "O valor do frete expirou ou o endereço mudou. Calcule o frete de novo.",
 };
 
 const addressSchema = z.object({
@@ -80,6 +82,7 @@ export const checkoutSchema = z
     fulfillment: z.enum(["PICKUP", "DELIVERY"]),
     address: addressSchema.optional(),
     paymentMethod: z.enum(["PIX", "CASH", "CARD"]),
+    deliveryQuoteId: z.string().optional(),
     changeForCents: z.number().int().nonnegative().optional(),
     notes: z.string().max(500).optional(),
     privacyAccepted: z.literal(true),
@@ -128,10 +131,18 @@ export async function createOrder(storeId: string, raw: CheckoutInput, now: Date
   if (subtotalCents < store.minOrderCents) throw new OrderError("MIN_ORDER");
 
   let deliveryFeeCents = 0;
+  let distance: { km: number; min: number; breakdown: Prisma.InputJsonValue } | null = null;
   if (input.fulfillment === "DELIVERY") {
-    const quote = await quoteDelivery(storeId, input.address!.district);
-    if ("error" in quote) throw new OrderError("NOT_SERVED");
-    deliveryFeeCents = quote.feeCents;
+    if (store.deliveryPricing === "ZONES") {
+      const quote = await quoteDelivery(storeId, input.address!.district);
+      if ("error" in quote) throw new OrderError("NOT_SERVED");
+      deliveryFeeCents = quote.feeCents;
+    } else {
+      const q = await findValidQuote(storeId, input.deliveryQuoteId, input.address!, now);
+      if (!q) throw new OrderError("QUOTE_EXPIRED");
+      deliveryFeeCents = q.feeCents;
+      distance = { km: q.distanceKm, min: q.durationMin, breakdown: q.breakdown as Prisma.InputJsonValue };
+    }
   }
 
   if (input.type === "READY") {
@@ -170,6 +181,9 @@ export async function createOrder(storeId: string, raw: CheckoutInput, now: Date
           addressSnapshot: (input.address ?? undefined) as Prisma.InputJsonValue | undefined,
           subtotalCents,
           deliveryFeeCents,
+          deliveryDistanceKm: distance?.km ?? null,
+          deliveryDurationMin: distance?.min ?? null,
+          deliveryBreakdown: distance?.breakdown,
           totalCents: subtotalCents + deliveryFeeCents,
           paymentMethod: input.paymentMethod,
           changeForCents: input.paymentMethod === "CASH" ? input.changeForCents : null,

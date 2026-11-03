@@ -64,6 +64,11 @@ enum PaymentMethod {
   CARD
 }
 
+enum DeliveryPricing {
+  ZONES
+  DISTANCE
+}
+
 enum PaymentStatus {
   PENDING
   PAID
@@ -87,19 +92,35 @@ model Store {
   deliveryEnabled   Boolean         @default(true) @map("delivery_enabled")
   paymentMethods    PaymentMethod[] @map("payment_methods")
   orderSeq          Int             @default(0) @map("order_seq")
-  createdAt         DateTime        @default(now()) @map("created_at")
 
-  users              User[]
-  categories         Category[]
-  products           Product[]
-  businessHours      BusinessHour[]
-  weeklyPlan         WeeklyBatchPlan[]
-  exceptions         CalendarException[]
-  batches            ProductionBatch[]
-  dailyMenus         DailyMenu[]
-  customers          Customer[]
-  deliveryZones      DeliveryZone[]
-  orders             Order[]
+  // frete
+  deliveryPricing         DeliveryPricing @default(DISTANCE) @map("delivery_pricing")
+  originAddress           String?         @map("origin_address")
+  originLat               Float?          @map("origin_lat")
+  originLng               Float?          @map("origin_lng")
+  deliveryBaseCents       Int             @default(500) @map("delivery_base_cents")
+  deliveryPerKmCents      Int             @default(150) @map("delivery_per_km_cents")
+  deliveryPerMinuteCents  Int             @default(30) @map("delivery_per_minute_cents")
+  deliveryMinFeeCents     Int             @default(700) @map("delivery_min_fee_cents")
+  deliveryServiceFeeCents Int             @default(0) @map("delivery_service_fee_cents")
+  deliveryMaxKm           Float           @default(15) @map("delivery_max_km")
+  surgeMultiplier         Float           @default(1) @map("surge_multiplier")
+  surgeStart              String?         @map("surge_start")
+  surgeEnd                String?         @map("surge_end")
+  createdAt               DateTime        @default(now()) @map("created_at")
+
+  users          User[]
+  categories     Category[]
+  products       Product[]
+  businessHours  BusinessHour[]
+  weeklyPlan     WeeklyBatchPlan[]
+  exceptions     CalendarException[]
+  batches        ProductionBatch[]
+  dailyMenus     DailyMenu[]
+  customers      Customer[]
+  deliveryZones  DeliveryZone[]
+  deliveryQuotes DeliveryQuote[]
+  orders         Order[]
 
   @@map("stores")
 }
@@ -151,12 +172,12 @@ model Product {
   sortOrder        Int        @default(0) @map("sort_order")
   createdAt        DateTime   @default(now()) @map("created_at")
 
-  variants        ProductVariant[]
-  weeklyPlan      WeeklyBatchPlan[]
-  exceptionPlan   ExceptionBatchPlan[]
-  batches         ProductionBatch[]
-  dailyMenuItems  DailyMenuItem[]
-  orderItems      OrderItem[]
+  variants       ProductVariant[]
+  weeklyPlan     WeeklyBatchPlan[]
+  exceptionPlan  ExceptionBatchPlan[]
+  batches        ProductionBatch[]
+  dailyMenuItems DailyMenuItem[]
+  orderItems     OrderItem[]
 
   @@index([storeId])
   @@map("products")
@@ -345,29 +366,50 @@ model DeliveryZone {
   @@map("delivery_zones")
 }
 
+model DeliveryQuote {
+  id          String   @id @default(cuid())
+  storeId     String   @map("store_id")
+  store       Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  addressKey  String   @map("address_key")
+  lat         Float
+  lng         Float
+  distanceKm  Float    @map("distance_km")
+  durationMin Int      @map("duration_min")
+  feeCents    Int      @map("fee_cents")
+  breakdown   Json
+  expiresAt   DateTime @map("expires_at") @db.Timestamptz(3)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([storeId, addressKey])
+  @@map("delivery_quotes")
+}
+
 model Order {
-  id               String        @id @default(cuid())
-  storeId          String        @map("store_id")
-  store            Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  code             String
-  customerId       String        @map("customer_id")
-  customer         Customer      @relation(fields: [customerId], references: [id])
-  type             OrderType
-  status           OrderStatus   @default(AWAITING_CONFIRMATION)
-  scheduledDate    DateTime?     @map("scheduled_date") @db.Date
-  handoffAt        DateTime?     @map("handoff_at") @db.Timestamptz(3)
-  fulfillment      Fulfillment
-  addressSnapshot  Json?         @map("address_snapshot")
-  subtotalCents    Int           @map("subtotal_cents")
-  deliveryFeeCents Int           @default(0) @map("delivery_fee_cents")
-  totalCents       Int           @map("total_cents")
-  paymentMethod    PaymentMethod @map("payment_method")
-  changeForCents   Int?          @map("change_for_cents")
-  paymentStatus    PaymentStatus @default(PENDING) @map("payment_status")
-  notes            String?
-  cancelReason     String?       @map("cancel_reason")
-  publicToken      String        @unique @map("public_token")
-  createdAt        DateTime      @default(now()) @map("created_at")
+  id                  String        @id @default(cuid())
+  storeId             String        @map("store_id")
+  store               Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  code                String
+  customerId          String        @map("customer_id")
+  customer            Customer      @relation(fields: [customerId], references: [id])
+  type                OrderType
+  status              OrderStatus   @default(AWAITING_CONFIRMATION)
+  scheduledDate       DateTime?     @map("scheduled_date") @db.Date
+  handoffAt           DateTime?     @map("handoff_at") @db.Timestamptz(3)
+  fulfillment         Fulfillment
+  addressSnapshot     Json?         @map("address_snapshot")
+  subtotalCents       Int           @map("subtotal_cents")
+  deliveryFeeCents    Int           @default(0) @map("delivery_fee_cents")
+  deliveryDistanceKm  Float?        @map("delivery_distance_km")
+  deliveryDurationMin Int?          @map("delivery_duration_min")
+  deliveryBreakdown   Json?         @map("delivery_breakdown")
+  totalCents          Int           @map("total_cents")
+  paymentMethod       PaymentMethod @map("payment_method")
+  changeForCents      Int?          @map("change_for_cents")
+  paymentStatus       PaymentStatus @default(PENDING) @map("payment_status")
+  notes               String?
+  cancelReason        String?       @map("cancel_reason")
+  publicToken         String        @unique @map("public_token")
+  createdAt           DateTime      @default(now()) @map("created_at")
 
   items   OrderItem[]
   history OrderStatusHistory[]
