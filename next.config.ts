@@ -4,6 +4,10 @@ const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
   partialPrefetching: true,
+  serverExternalPackages: ["pg"],
+  experimental: {
+    authInterrupts: true,
+  },
   turbopack: {
     rules: {
       "*.css": {
