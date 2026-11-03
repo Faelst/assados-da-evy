@@ -1,5 +1,6 @@
 "use client";
 
+import { TimeSelect } from "@/components/admin/TimeSelect";
 import { useActionState, useState } from "react";
 import { Plus } from "lucide-react";
 import { createExceptionAction } from "@/app/admin/(painel)/excecoes/actions";
@@ -27,11 +28,11 @@ export function ExceptionForm({ products }: { products: { id: string; name: stri
           <>
             <label>
               <span className="text-sm font-semibold">Abre {type === "SPECIAL_MENU" && <span className="font-normal text-ink/50">(opcional)</span>}</span>
-              <input type="time" name="opensAt" required={type === "SPECIAL_HOURS"} className="input mt-1" />
+              <TimeSelect name="opensAt" optional required={type === "SPECIAL_HOURS"} className="mt-1" />
             </label>
             <label>
               <span className="text-sm font-semibold">Fecha</span>
-              <input type="time" name="closesAt" required={type === "SPECIAL_HOURS"} className="input mt-1" />
+              <TimeSelect name="closesAt" optional required={type === "SPECIAL_HOURS"} className="mt-1" />
             </label>
           </>
         )}
@@ -45,7 +46,7 @@ export function ExceptionForm({ products }: { products: { id: string; name: stri
           <p className="text-sm font-semibold">Fornadas desse dia</p>
           {Array.from({ length: rows }, (_, i) => (
             <div key={i} className="flex gap-2">
-              <input type="time" name="planStart" className="input w-32" required />
+              <TimeSelect name="planStart" defaultValue="09:00" className="w-28" required aria-label="Início" />
               <select name="planProduct" className="input flex-1">
                 {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>

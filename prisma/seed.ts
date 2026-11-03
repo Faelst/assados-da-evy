@@ -51,6 +51,11 @@ async function main() {
         pickupAddress: `${BRAND.city} — combine o endereço pelo WhatsApp`,
         paymentMethods: ["PIX", "CASH", "CARD"],
         minOrderCents: 0,
+        // ponto de saída provisório (Centro de Jacareí): ajuste em Painel > Entrega
+        deliveryPricing: "DISTANCE",
+        originAddress: "Praça dos Três Poderes, Jacareí - SP",
+        originLat: -23.306,
+        originLng: -45.975,
       },
     });
     console.log("Loja criada");

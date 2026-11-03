@@ -54,3 +54,8 @@ export const osmProvider: RoutingProvider = {
     return { distanceKm: Math.round(r.distance / 100) / 10, durationMin: Math.max(1, Math.ceil(r.duration / 60)) };
   },
 };
+
+/** Localiza um endereço digitado livremente (usado para o endereço de saída da loja). */
+export async function geocodeText(text: string): Promise<LatLng | null> {
+  return nominatim({ q: text });
+}

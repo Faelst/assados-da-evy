@@ -1,5 +1,6 @@
 "use client";
 
+import { TimeSelect } from "@/components/admin/TimeSelect";
 import { useMemo, useState, useTransition } from "react";
 import { Plus, Trash2, Wand2 } from "lucide-react";
 import { fillDay } from "@/server/domain/production";
@@ -117,11 +118,10 @@ export function PlanEditor({
                 const end = p && r.startTime ? hhmmOf(minutesOf(r.startTime) + p.batchDurationMin) : "";
                 return (
                   <li key={i} className={`flex flex-wrap items-center gap-2 rounded-2xl p-2 ring-1 ${errors[i] ? "bg-tomato/5 ring-tomato" : "ring-terracotta/10"}`}>
-                    <input
-                      type="time"
-                      className="input w-32"
+                    <TimeSelect
+                      className="w-28"
                       value={r.startTime}
-                      onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, startTime: e.target.value } : x)))}
+                      onChange={(v) => setRows(rows.map((x, j) => (j === i ? { ...x, startTime: v } : x)))}
                       aria-label="Início"
                     />
                     <select

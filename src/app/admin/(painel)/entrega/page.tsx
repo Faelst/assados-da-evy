@@ -3,6 +3,7 @@ import { requireSection } from "@/server/auth";
 import { getStore } from "@/server/store";
 import { formatCents } from "@/lib/phone";
 import { PageHeader } from "@/components/admin/PageHeader";
+import { PricingForm } from "@/components/admin/PricingForm";
 import { addZoneAction, removeZoneAction, saveDeliverySettingsAction } from "./actions";
 
 export default async function Entrega() {
@@ -29,8 +30,27 @@ export default async function Entrega() {
         </label>
         <button className="btn-primary sm:col-span-2 sm:justify-self-start">Salvar</button>
       </form>
-      <section className="card space-y-3">
-        <h2 className="font-display text-lg font-bold">Bairros atendidos e taxa</h2>
+      <div className="mb-4">
+        <PricingForm
+          initial={{
+            deliveryPricing: store.deliveryPricing,
+            originAddress: store.originAddress ?? "",
+            originLat: store.originLat,
+            originLng: store.originLng,
+            base: store.deliveryBaseCents,
+            perKm: store.deliveryPerKmCents,
+            perMinute: store.deliveryPerMinuteCents,
+            minFee: store.deliveryMinFeeCents,
+            serviceFee: store.deliveryServiceFeeCents,
+            maxKm: store.deliveryMaxKm,
+            surgeMultiplier: store.surgeMultiplier,
+            surgeStart: store.surgeStart,
+            surgeEnd: store.surgeEnd,
+          }}
+        />
+      </div>
+      <section className={`card space-y-3 ${store.deliveryPricing === "ZONES" ? "" : "opacity-70"}`}>
+        <h2 className="font-display text-lg font-bold">Bairros atendidos e taxa {store.deliveryPricing !== "ZONES" && <span className="text-sm font-normal text-ink/50">(usado só no modo por bairro)</span>}</h2>
         <ul className="divide-y divide-terracotta/10">
           {zones.map((z) => (
             <li key={z.id} className="flex items-center justify-between py-2">

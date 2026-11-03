@@ -1,5 +1,6 @@
 "use client";
 
+import { TimeSelect } from "@/components/admin/TimeSelect";
 import { useActionState } from "react";
 import { addBatchAction } from "@/app/admin/(painel)/fornadas/actions";
 
@@ -16,7 +17,7 @@ export function AddBatchForm({ date, products }: { date: string; products: { id:
       </label>
       <label>
         <span className="text-sm font-semibold">Início</span>
-        <input type="time" name="startTime" required className="input mt-1 w-32" />
+        <TimeSelect name="startTime" defaultValue="09:00" required className="mt-1 w-28" />
       </label>
       <button className="btn-primary" disabled={pending}>Adicionar fornada</button>
       {state?.error && <p className="w-full text-sm font-semibold text-tomato">{state.error}</p>}

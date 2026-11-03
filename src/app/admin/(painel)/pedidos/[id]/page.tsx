@@ -71,6 +71,19 @@ export default async function PedidoAdmin({ params }: PageProps<"/admin/pedidos/
             <p>{address.district} · {address.city}/{address.state} · CEP {address.cep}</p>
             {address.reference && <p>Referência: {address.reference}</p>}
             {address.notes && <p>Entregador: {address.notes}</p>}
+            {order.deliveryDistanceKm != null && (
+              <p className="mt-1 font-semibold">
+                {order.deliveryDistanceKm.toLocaleString("pt-BR")} km · ~{order.deliveryDurationMin} min de rota
+              </p>
+            )}
+            <a
+              className="no-print btn-ghost -ml-3 mt-1"
+              target="_blank"
+              rel="noopener noreferrer"
+              href={`https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=${encodeURIComponent(`${address.street}, ${address.number} - ${address.district}, ${address.city} - ${address.state}, ${address.cep}`)}`}
+            >
+              Abrir rota no mapa
+            </a>
           </div>
         )}
       </section>

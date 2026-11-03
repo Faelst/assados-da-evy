@@ -8,6 +8,8 @@ import { formatCents } from "@/lib/phone";
 import { waLink } from "@/lib/data";
 import { WhatsAppIcon } from "@/components/icons";
 import { OrderPageEffects } from "@/components/loja/OrderPageEffects";
+import { DeliveryBreakdown } from "@/components/loja/DeliveryBreakdown";
+import type { FeeBreakdown } from "@/server/domain/delivery-pricing";
 
 export const metadata = { title: "Seu pedido — Assados da Evy", robots: { index: false } };
 
@@ -94,6 +96,7 @@ export default async function PedidoPage({ params, searchParams }: PageProps<"/p
           {order.deliveryFeeCents > 0 && (
             <div className="flex justify-between"><span>Entrega</span><span>{formatCents(order.deliveryFeeCents)}</span></div>
           )}
+          {order.deliveryBreakdown && <DeliveryBreakdown b={order.deliveryBreakdown as unknown as FeeBreakdown} />}
           <div className="flex justify-between font-bold text-terracotta"><span>Total</span><span>{formatCents(order.totalCents)}</span></div>
           <p className="text-ink/60">
             Pagamento: {PAYMENT[order.paymentMethod]}

@@ -1,5 +1,6 @@
 "use client";
 
+import { TimeSelect } from "@/components/admin/TimeSelect";
 import { useState, useTransition } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { WEEKDAYS_PT } from "@/server/domain/time";
@@ -24,9 +25,9 @@ export function HoursEditor({ initial }: { initial: Row[] }) {
               {dayRows.length === 0 && <span className="chip bg-ink/10 text-ink/60">Fechado</span>}
               {dayRows.map(({ r, i }) => (
                 <span key={i} className="flex items-center gap-1 rounded-2xl bg-cream p-1">
-                  <input type="time" className="input w-28 py-1.5" value={r.opensAt} onChange={(e) => update(i, { opensAt: e.target.value })} aria-label="Abre" />
+                  <TimeSelect className="w-24 py-1.5" value={r.opensAt} onChange={(v) => update(i, { opensAt: v })} aria-label="Abre" />
                   <span>às</span>
-                  <input type="time" className="input w-28 py-1.5" value={r.closesAt} onChange={(e) => update(i, { closesAt: e.target.value })} aria-label="Fecha" />
+                  <TimeSelect className="w-24 py-1.5" value={r.closesAt} onChange={(v) => update(i, { closesAt: v })} aria-label="Fecha" />
                   <button type="button" aria-label="Remover turno" className="px-1 text-ink/40 hover:text-tomato" onClick={() => setRows(rows.filter((_, j) => j !== i))}>
                     <Trash2 className="size-4" />
                   </button>

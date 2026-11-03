@@ -17,6 +17,8 @@ export default async function Checkout() {
         pickupAddress: store.pickupAddress,
         minOrderCents: store.minOrderCents,
         readyEtaMinutes: store.readyEtaMinutes,
+        deliveryPricing: store.deliveryPricing,
+        deliveryMaxKm: store.deliveryMaxKm,
       }}
       zones={zones.map((z) => ({ district: z.district, feeCents: z.feeCents }))}
     />

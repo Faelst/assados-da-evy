@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Bike, Store as StoreIcon, Timer } from "lucide-react";
 import { formatCents, isValidName, isValidPhone, maskPhone } from "@/lib/phone";
-import { holdAction, placeOrderAction } from "@/app/(loja)/checkout/actions";
+import { holdAction, placeOrderAction, quoteDeliveryAction } from "@/app/(loja)/checkout/actions";
+import type { FeeBreakdown } from "@/server/domain/delivery-pricing";
+import { DeliveryBreakdown } from "./DeliveryBreakdown";
 import { useCart } from "./cart";
 
 type StoreCfg = {
@@ -15,7 +17,15 @@ type StoreCfg = {
   pickupAddress: string | null;
   minOrderCents: number;
   readyEtaMinutes: number;
+  deliveryPricing: "ZONES" | "DISTANCE";
+  deliveryMaxKm: number;
 };
+
+type QuoteState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "ok"; key: string; quoteId: string; feeCents: number; breakdown: FeeBreakdown }
+  | { status: "error"; message: string };
 type Zone = { district: string; feeCents: number };
 
 type Address = {
@@ -57,6 +67,9 @@ export function CheckoutForm({ store, zones }: { store: StoreCfg; zones: Zone[] 
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [cepState, setCepState] = useState<"idle" | "loading" | "notfound">("idle");
+  const [quote, setQuote] = useState<QuoteState>({ status: "idle" });
+  const [quoteNonce, setQuoteNonce] = useState(0);
+  const byDistance = store.deliveryPricing === "DISTANCE";
 
   // reserva de horário (encomenda)
   const [holdUntil, setHoldUntil] = useState<number | null>(null);
@@ -109,7 +122,32 @@ export function CheckoutForm({ store, zones }: { store: StoreCfg; zones: Zone[] 
   }, [holdUntil]);
 
   const zone = useMemo(() => zones.find((z) => norm(z.district) === norm(address.district)), [zones, address.district]);
-  const fee = fulfillment === "DELIVERY" ? (zone?.feeCents ?? 0) : 0;
+
+  // frete por distância: recalcula quando o endereço fica completo
+  const addressReady =
+    address.cep.replace(/\D/g, "").length === 8 && !!address.street.trim() && !!address.number.trim() && !!address.city.trim() && !!address.state.trim();
+  const quoteKey = [address.cep, address.street, address.number, address.city, address.state].map(norm).join("|");
+  useEffect(() => {
+    if (!byDistance || fulfillment !== "DELIVERY" || !addressReady) return;
+    let cancelled = false;
+    const t = setTimeout(() => {
+      setQuote({ status: "loading" });
+      quoteDeliveryAction({
+        cep: address.cep, street: address.street, number: address.number, district: address.district, city: address.city, state: address.state,
+      }).then((r) => {
+        if (cancelled) return;
+        setQuote("error" in r ? { status: "error", message: r.error } : { status: "ok", key: quoteKey, ...r });
+      });
+    }, 700);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- quoteKey resume o endereço
+  }, [byDistance, fulfillment, addressReady, quoteKey, quoteNonce]);
+  const quoteOk = quote.status === "ok" && quote.key === quoteKey ? quote : null;
+
+  const fee = fulfillment === "DELIVERY" ? (byDistance ? (quoteOk?.feeCents ?? 0) : (zone?.feeCents ?? 0)) : 0;
   const total = subtotalCents + fee;
   const secondsLeft = holdUntil ? Math.max(0, Math.round((holdUntil - now) / 1000)) : null;
   const holdExpired = scheduled && secondsLeft === 0;
@@ -129,7 +167,7 @@ export function CheckoutForm({ store, zones }: { store: StoreCfg; zones: Zone[] 
       setAddress((a) => ({
         ...a,
         street: data.logradouro || a.street,
-        district: matched?.district ?? a.district,
+        district: byDistance ? data.bairro || a.district : (matched?.district ?? a.district),
         city: data.localidade || a.city,
         state: data.uf || a.state,
       }));
@@ -165,7 +203,7 @@ export function CheckoutForm({ store, zones }: { store: StoreCfg; zones: Zone[] 
     isValidPhone(phone) &&
     privacy &&
     (fulfillment === "PICKUP" ||
-      (address.cep.replace(/\D/g, "").length === 8 && address.street && address.number && zone && address.city && address.state)) &&
+      (addressReady && !!address.district.trim() && (byDistance ? !!quoteOk : !!zone))) &&
     subtotalCents >= store.minOrderCents &&
     !holdExpired &&
     !holdError;
@@ -197,6 +235,7 @@ export function CheckoutForm({ store, zones }: { store: StoreCfg; zones: Zone[] 
               }
             : undefined,
         paymentMethod: payment,
+        deliveryQuoteId: fulfillment === "DELIVERY" && quoteOk ? quoteOk.quoteId : undefined,
         changeForCents: payment === "CASH" && changeFor ? Math.round(Number(changeFor.replace(",", ".")) * 100) || undefined : undefined,
         notes: notes || undefined,
         privacyAccepted: true,
@@ -204,6 +243,7 @@ export function CheckoutForm({ store, zones }: { store: StoreCfg; zones: Zone[] 
       if (r) {
         setError(r.error);
         setErrorCode(r.code);
+        if (r.code === "QUOTE_EXPIRED") setQuoteNonce((n) => n + 1);
       }
     });
   }
@@ -270,7 +310,8 @@ export function CheckoutForm({ store, zones }: { store: StoreCfg; zones: Zone[] 
                 <span>
                   <span className="flex items-center gap-1.5 font-bold"><Bike className="size-4" /> Entrega</span>
                   <span className="block text-sm text-ink/60">
-                    {scheduled ? `Sai às ${cart.handoffLabel}` : `Em até ${store.readyEtaMinutes} min`} · taxa por bairro
+                    {scheduled ? `Sai às ${cart.handoffLabel}` : `Sai em até ${store.readyEtaMinutes} min`} ·{" "}
+                    {byDistance ? `frete por distância (até ${store.deliveryMaxKm} km)` : "taxa por bairro"}
                   </span>
                 </span>
               </label>
@@ -310,16 +351,22 @@ export function CheckoutForm({ store, zones }: { store: StoreCfg; zones: Zone[] 
               </label>
               <label className="block sm:col-span-3">
                 <span className="text-sm font-semibold">Bairro</span>
-                <select className="input mt-1" value={zone?.district ?? ""} onChange={set("district")} required>
-                  <option value="" disabled>Selecione o bairro</option>
-                  {zones.map((z) => (
-                    <option key={z.district} value={z.district}>
-                      {z.district} · {formatCents(z.feeCents)}
-                    </option>
-                  ))}
-                </select>
-                {address.district && !zone && (
-                  <span className="text-xs text-tomato">Ainda não entregamos em “{address.district}”. Escolha um bairro da lista ou retire na loja.</span>
+                {byDistance ? (
+                  <input className="input mt-1" value={address.district} onChange={set("district")} required />
+                ) : (
+                  <>
+                    <select className="input mt-1" value={zone?.district ?? ""} onChange={set("district")} required>
+                      <option value="" disabled>Selecione o bairro</option>
+                      {zones.map((z) => (
+                        <option key={z.district} value={z.district}>
+                          {z.district} · {formatCents(z.feeCents)}
+                        </option>
+                      ))}
+                    </select>
+                    {address.district && !zone && (
+                      <span className="text-xs text-tomato">Ainda não entregamos em “{address.district}”. Escolha um bairro da lista ou retire na loja.</span>
+                    )}
+                  </>
                 )}
               </label>
               <label className="block sm:col-span-2">
@@ -338,6 +385,22 @@ export function CheckoutForm({ store, zones }: { store: StoreCfg; zones: Zone[] 
                 <span className="text-sm font-semibold">Instruções para o entregador</span>
                 <input className="input mt-1" value={address.notes} onChange={set("notes")} placeholder="Portaria, interfone…" />
               </label>
+              {byDistance && (
+                <div className="sm:col-span-6">
+                  {!addressReady ? (
+                    <p className="text-sm text-ink/60">Preencha o endereço para calcular o frete.</p>
+                  ) : quote.status === "loading" || (quote.status === "ok" && !quoteOk) ? (
+                    <p className="text-sm text-ink/60">Calculando a rota…</p>
+                  ) : quote.status === "error" ? (
+                    <p className="text-sm font-semibold text-tomato">
+                      {quote.message}{" "}
+                      <button type="button" className="underline" onClick={() => setQuoteNonce((n) => n + 1)}>Tentar de novo</button>
+                    </p>
+                  ) : quoteOk ? (
+                    <DeliveryBreakdown b={quoteOk.breakdown} />
+                  ) : null}
+                </div>
+              )}
             </div>
           )}
         </fieldset>
@@ -393,7 +456,10 @@ export function CheckoutForm({ store, zones }: { store: StoreCfg; zones: Zone[] 
           <div className="space-y-1 border-t border-terracotta/10 pt-3 text-sm">
             <div className="flex justify-between"><span>Subtotal</span><span>{formatCents(subtotalCents)}</span></div>
             {fulfillment === "DELIVERY" && (
-              <div className="flex justify-between"><span>Entrega</span><span>{zone ? formatCents(fee) : "—"}</span></div>
+              <div className="flex justify-between">
+                <span>Entrega{quoteOk ? ` · ${quoteOk.breakdown.distanceKm.toLocaleString("pt-BR")} km` : ""}</span>
+                <span>{(byDistance ? quoteOk : zone) ? formatCents(fee) : "—"}</span>
+              </div>
             )}
             <div className="flex justify-between pt-1 font-display text-xl font-bold text-terracotta"><span>Total</span><span>{formatCents(total)}</span></div>
           </div>
