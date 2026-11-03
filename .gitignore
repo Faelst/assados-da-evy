@@ -45,3 +45,7 @@ data/
 /graft/
 
 .superpowers/
+
+/src/generated/
+/public/uploads/
+!.env.example

@@ -1,0 +1,420 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  OWNER
+  ATTENDANT
+  KITCHEN
+}
+
+enum SaleMode {
+  READY
+  SCHEDULED
+}
+
+enum ExceptionType {
+  CLOSED
+  SPECIAL_HOURS
+  SPECIAL_MENU
+}
+
+enum DailyMenuStatus {
+  OPEN
+  CLOSED
+}
+
+enum StockMovementType {
+  IN
+  OUT
+  SALE
+  CANCEL
+  LOSS
+}
+
+enum OrderType {
+  READY
+  SCHEDULED
+}
+
+enum OrderStatus {
+  AWAITING_CONFIRMATION
+  CONFIRMED
+  PREPARING
+  READY
+  OUT_FOR_DELIVERY
+  DELIVERED
+  PICKED_UP
+  CANCELLED
+}
+
+enum Fulfillment {
+  PICKUP
+  DELIVERY
+}
+
+enum PaymentMethod {
+  PIX
+  CASH
+  CARD
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+}
+
+model Store {
+  id                String          @id @default(cuid())
+  name              String
+  slug              String          @unique
+  logoUrl           String?         @map("logo_url")
+  whatsapp          String
+  timezone          String          @default("America/Sao_Paulo")
+  minOrderCents     Int             @default(0) @map("min_order_cents")
+  parallelBatches   Int             @default(1) @map("parallel_batches")
+  bookingWindowDays Int             @default(30) @map("booking_window_days")
+  holdMinutes       Int             @default(10) @map("hold_minutes")
+  readyEtaMinutes   Int             @default(60) @map("ready_eta_minutes")
+  pixKey            String?         @map("pix_key")
+  pickupAddress     String?         @map("pickup_address")
+  pickupEnabled     Boolean         @default(true) @map("pickup_enabled")
+  deliveryEnabled   Boolean         @default(true) @map("delivery_enabled")
+  paymentMethods    PaymentMethod[] @map("payment_methods")
+  orderSeq          Int             @default(0) @map("order_seq")
+  createdAt         DateTime        @default(now()) @map("created_at")
+
+  users              User[]
+  categories         Category[]
+  products           Product[]
+  businessHours      BusinessHour[]
+  weeklyPlan         WeeklyBatchPlan[]
+  exceptions         CalendarException[]
+  batches            ProductionBatch[]
+  dailyMenus         DailyMenu[]
+  customers          Customer[]
+  deliveryZones      DeliveryZone[]
+  orders             Order[]
+
+  @@map("stores")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  storeId      String   @map("store_id")
+  store        Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  name         String
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         Role
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  stockMovements StockMovement[]
+  statusChanges  OrderStatusHistory[]
+
+  @@map("users")
+}
+
+model Category {
+  id        String    @id @default(cuid())
+  storeId   String    @map("store_id")
+  store     Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  name      String
+  sortOrder Int       @default(0) @map("sort_order")
+  products  Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id               String     @id @default(cuid())
+  storeId          String     @map("store_id")
+  store            Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  categoryId       String?    @map("category_id")
+  category         Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  name             String
+  description      String     @default("")
+  priceCents       Int        @map("price_cents")
+  imageUrl         String?    @map("image_url")
+  saleModes        SaleMode[] @map("sale_modes")
+  leadTimeHours    Int        @default(24) @map("lead_time_hours")
+  batchSize        Int        @default(10) @map("batch_size")
+  batchDurationMin Int        @default(60) @map("batch_duration_min")
+  productionUnits  Int        @default(1) @map("production_units")
+  active           Boolean    @default(true)
+  sortOrder        Int        @default(0) @map("sort_order")
+  createdAt        DateTime   @default(now()) @map("created_at")
+
+  variants        ProductVariant[]
+  weeklyPlan      WeeklyBatchPlan[]
+  exceptionPlan   ExceptionBatchPlan[]
+  batches         ProductionBatch[]
+  dailyMenuItems  DailyMenuItem[]
+  orderItems      OrderItem[]
+
+  @@index([storeId])
+  @@map("products")
+}
+
+model ProductVariant {
+  id              String      @id @default(cuid())
+  productId       String      @map("product_id")
+  product         Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name            String
+  priceDeltaCents Int         @default(0) @map("price_delta_cents")
+  orderItems      OrderItem[]
+
+  @@map("product_variants")
+}
+
+model BusinessHour {
+  id       String @id @default(cuid())
+  storeId  String @map("store_id")
+  store    Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  weekday  Int
+  opensAt  String @map("opens_at")
+  closesAt String @map("closes_at")
+
+  @@index([storeId, weekday])
+  @@map("business_hours")
+}
+
+model WeeklyBatchPlan {
+  id        String  @id @default(cuid())
+  storeId   String  @map("store_id")
+  store     Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  weekday   Int
+  productId String  @map("product_id")
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  startTime String  @map("start_time")
+
+  @@index([storeId, weekday])
+  @@map("weekly_batch_plan")
+}
+
+model CalendarException {
+  id       String               @id @default(cuid())
+  storeId  String               @map("store_id")
+  store    Store                @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  date     DateTime             @db.Date
+  type     ExceptionType
+  opensAt  String?              @map("opens_at")
+  closesAt String?              @map("closes_at")
+  note     String?
+  plan     ExceptionBatchPlan[]
+
+  @@unique([storeId, date])
+  @@map("calendar_exceptions")
+}
+
+model ExceptionBatchPlan {
+  id          String            @id @default(cuid())
+  exceptionId String            @map("exception_id")
+  exception   CalendarException @relation(fields: [exceptionId], references: [id], onDelete: Cascade)
+  productId   String            @map("product_id")
+  product     Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  startTime   String            @map("start_time")
+
+  @@map("exception_batch_plan")
+}
+
+model ProductionBatch {
+  id            String   @id @default(cuid())
+  storeId       String   @map("store_id")
+  store         Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  date          DateTime @db.Date
+  productId     String   @map("product_id")
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  startsAt      DateTime @map("starts_at") @db.Timestamptz(3)
+  readyAt       DateTime @map("ready_at") @db.Timestamptz(3)
+  capacityUnits Int      @map("capacity_units")
+  usedUnits     Int      @default(0) @map("used_units")
+  heldUnits     Int      @default(0) @map("held_units")
+  blocked       Boolean  @default(false)
+  manual        Boolean  @default(false)
+
+  holds      BatchHold[]
+  orderItems OrderItemBatch[]
+
+  @@unique([storeId, productId, startsAt])
+  @@index([storeId, date])
+  @@map("production_batches")
+}
+
+model BatchHold {
+  id        String          @id @default(cuid())
+  batchId   String          @map("batch_id")
+  batch     ProductionBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  sessionId String          @map("session_id")
+  units     Int
+  expiresAt DateTime        @map("expires_at") @db.Timestamptz(3)
+
+  @@index([sessionId])
+  @@index([expiresAt])
+  @@map("batch_holds")
+}
+
+model DailyMenu {
+  id      String          @id @default(cuid())
+  storeId String          @map("store_id")
+  store   Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  date    DateTime        @db.Date
+  status  DailyMenuStatus @default(OPEN)
+  items   DailyMenuItem[]
+
+  @@unique([storeId, date])
+  @@map("daily_menus")
+}
+
+model DailyMenuItem {
+  id           String          @id @default(cuid())
+  dailyMenuId  String          @map("daily_menu_id")
+  dailyMenu    DailyMenu       @relation(fields: [dailyMenuId], references: [id], onDelete: Cascade)
+  productId    String          @map("product_id")
+  product      Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  qtyInitial   Int             @map("qty_initial")
+  qtyAvailable Int             @map("qty_available")
+  paused       Boolean         @default(false)
+  movements    StockMovement[]
+
+  @@unique([dailyMenuId, productId])
+  @@map("daily_menu_items")
+}
+
+model StockMovement {
+  id              String            @id @default(cuid())
+  dailyMenuItemId String            @map("daily_menu_item_id")
+  dailyMenuItem   DailyMenuItem     @relation(fields: [dailyMenuItemId], references: [id], onDelete: Cascade)
+  type            StockMovementType
+  qty             Int
+  reason          String?
+  orderId         String?           @map("order_id")
+  userId          String?           @map("user_id")
+  user            User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  @@map("stock_movements")
+}
+
+model Customer {
+  id        String    @id @default(cuid())
+  storeId   String    @map("store_id")
+  store     Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  name      String
+  phone     String
+  email     String?
+  createdAt DateTime  @default(now()) @map("created_at")
+  addresses Address[]
+  orders    Order[]
+
+  @@unique([storeId, phone])
+  @@map("customers")
+}
+
+model Address {
+  id         String   @id @default(cuid())
+  customerId String   @map("customer_id")
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  cep        String
+  street     String
+  number     String
+  complement String?
+  district   String
+  city       String
+  state      String
+  reference  String?
+  notes      String?
+
+  @@map("addresses")
+}
+
+model DeliveryZone {
+  id       String @id @default(cuid())
+  storeId  String @map("store_id")
+  store    Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  district String
+  feeCents Int    @map("fee_cents")
+
+  @@unique([storeId, district])
+  @@map("delivery_zones")
+}
+
+model Order {
+  id               String        @id @default(cuid())
+  storeId          String        @map("store_id")
+  store            Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  code             String
+  customerId       String        @map("customer_id")
+  customer         Customer      @relation(fields: [customerId], references: [id])
+  type             OrderType
+  status           OrderStatus   @default(AWAITING_CONFIRMATION)
+  scheduledDate    DateTime?     @map("scheduled_date") @db.Date
+  handoffAt        DateTime?     @map("handoff_at") @db.Timestamptz(3)
+  fulfillment      Fulfillment
+  addressSnapshot  Json?         @map("address_snapshot")
+  subtotalCents    Int           @map("subtotal_cents")
+  deliveryFeeCents Int           @default(0) @map("delivery_fee_cents")
+  totalCents       Int           @map("total_cents")
+  paymentMethod    PaymentMethod @map("payment_method")
+  changeForCents   Int?          @map("change_for_cents")
+  paymentStatus    PaymentStatus @default(PENDING) @map("payment_status")
+  notes            String?
+  cancelReason     String?       @map("cancel_reason")
+  publicToken      String        @unique @map("public_token")
+  createdAt        DateTime      @default(now()) @map("created_at")
+
+  items   OrderItem[]
+  history OrderStatusHistory[]
+
+  @@unique([storeId, code])
+  @@index([storeId, createdAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id             String           @id @default(cuid())
+  orderId        String           @map("order_id")
+  order          Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId      String           @map("product_id")
+  product        Product          @relation(fields: [productId], references: [id])
+  variantId      String?          @map("variant_id")
+  variant        ProductVariant?  @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  nameSnapshot   String           @map("name_snapshot")
+  unitPriceCents Int              @map("unit_price_cents")
+  qty            Int
+  notes          String?
+  batches        OrderItemBatch[]
+
+  @@map("order_items")
+}
+
+model OrderItemBatch {
+  id          String          @id @default(cuid())
+  orderItemId String          @map("order_item_id")
+  orderItem   OrderItem       @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  batchId     String          @map("batch_id")
+  batch       ProductionBatch @relation(fields: [batchId], references: [id])
+  units       Int
+
+  @@map("order_item_batches")
+}
+
+model OrderStatusHistory {
+  id         String       @id @default(cuid())
+  orderId    String       @map("order_id")
+  order      Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStatus OrderStatus? @map("from_status")
+  toStatus   OrderStatus  @map("to_status")
+  userId     String?      @map("user_id")
+  user       User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  reason     String?
+  createdAt  DateTime     @default(now()) @map("created_at")
+
+  @@map("order_status_history")
+}
