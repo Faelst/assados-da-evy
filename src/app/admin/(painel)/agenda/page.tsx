@@ -98,7 +98,11 @@ export default async function Agenda({ searchParams }: PageProps<"/admin/agenda"
                 const col = overlapping.indexOf(b);
                 const width = 100 / overlapping.length;
                 return (
-                  <div key={b.id ?? idx} className="absolute p-0.5" style={{ top, height, left: `${col * width}%`, width: `${width}%` }}>
+                  <div
+                    key={b.id ?? idx}
+                    className="absolute h-(--h) p-0.5 has-[details[open]]:z-30 has-[details[open]]:h-auto has-[details[open]]:min-h-(--h)"
+                    style={{ top, left: `${col * width}%`, width: `${width}%`, ["--h" as string]: `${height}px` }}
+                  >
                     <BatchCard b={b} />
                   </div>
                 );
