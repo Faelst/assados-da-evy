@@ -22,11 +22,12 @@ export type BatchView = {
 /** Devolve às fornadas as unidades de reservas vencidas e apaga as reservas. */
 export async function releaseExpiredHolds(now: Date = new Date()): Promise<number> {
   return db.$transaction(async (tx) => {
-    const expired = await tx.batchHold.findMany({ where: { expiresAt: { lte: now } } });
+    // DELETE … RETURNING reivindica cada reserva uma vez só, mesmo com chamadas simultâneas
+    const expired = await tx.$queryRaw<{ batch_id: string; units: number }[]>`
+      DELETE FROM batch_holds WHERE expires_at <= ${now} RETURNING batch_id, units`;
     for (const h of expired) {
-      await tx.$executeRaw`UPDATE production_batches SET held_units = held_units - ${h.units} WHERE id = ${h.batchId}`;
+      await tx.$executeRaw`UPDATE production_batches SET held_units = held_units - ${h.units} WHERE id = ${h.batch_id}`;
     }
-    await tx.batchHold.deleteMany({ where: { id: { in: expired.map((h) => h.id) } } });
     return expired.length;
   });
 }
@@ -83,8 +84,16 @@ async function syncRange(storeId: string, from: LocalDate, to: LocalDate): Promi
 
     for (const b of existing) {
       if (b.manual || desiredKeys.has(keyOf(b.productId, b.startsAt))) continue;
-      if (b.usedUnits > 0 || b.heldUnits > 0) conflicts.push(b);
-      else await db.productionBatch.delete({ where: { id: b.id } });
+      if (b.usedUnits > 0 || b.heldUnits > 0) {
+        conflicts.push(b);
+        continue;
+      }
+      // condicional: outra requisição pode ter apagado ou reservado a fornada nesse meio-tempo
+      const removed = await db.productionBatch.deleteMany({ where: { id: b.id, manual: false, usedUnits: 0, heldUnits: 0 } });
+      if (removed.count === 0) {
+        const still = await db.productionBatch.findUnique({ where: { id: b.id } });
+        if (still) conflicts.push(still);
+      }
     }
 
     const missing = desired.filter((d) => !existingKeys.has(keyOf(d.productId, d.startsAt)));

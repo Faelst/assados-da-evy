@@ -203,7 +203,13 @@ export async function createOrder(storeId: string, raw: CheckoutInput, now: Date
           await decrementForSale(tx, menuItem.id, item.qty, order.id);
         }
       } else {
-        await consumeHolds(tx, input.sessionId, order.items.map((i) => ({ id: i.id, productId: i.productId, qty: i.qty })), now);
+        await consumeHolds(
+          tx,
+          input.sessionId,
+          order.items.map((i) => ({ id: i.id, productId: i.productId, qty: i.qty })),
+          now,
+          { date: input.scheduledDate!, handoffAt: new Date(input.handoffAt!) },
+        );
       }
 
       return { code, publicToken };

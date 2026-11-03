@@ -20,7 +20,16 @@ async function loadProducts(storeId: string, ids: string[]) {
   return new Map(products.map((p) => [p.id, p]));
 }
 
+const validLine = (l: CartLine) => Number.isInteger(l.qty) && l.qty > 0 && l.qty <= 999;
+
+/** A data está dentro da janela de agenda (hoje .. hoje + bookingWindowDays)? */
+function inWindow(store: { timezone: string; bookingWindowDays: number }, date: LocalDate, now: Date) {
+  const today = todayIn(store.timezone, now);
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) && date >= today && date <= addDays(today, store.bookingWindowDays);
+}
+
 async function toUnits(storeId: string, lines: CartLine[]) {
+  if (lines.length === 0 || lines.length > 50 || !lines.every(validLine)) throw new BookingError("UNAVAILABLE");
   const products = await loadProducts(storeId, [...new Set(lines.map((l) => l.productId))]);
   const lead: Record<string, number> = {};
   const units = lines.map((l) => {
@@ -40,6 +49,7 @@ export async function availableHandoffs(
   now: Date = new Date(),
 ): Promise<{ at: Date; label: string; available: boolean }[]> {
   const store = await db.store.findUniqueOrThrow({ where: { id: storeId } });
+  if (!inWindow(store, date, now)) return [];
   await releaseExpiredHolds(now);
   await ensureBatches(storeId, date, date);
   const batches = await listDayBatches(storeId, date);
@@ -104,6 +114,7 @@ export async function holdBooking(
   now: Date = new Date(),
 ): Promise<{ holdIds: string[]; expiresAt: Date } | { error: "UNAVAILABLE" }> {
   const store = await db.store.findUniqueOrThrow({ where: { id: storeId } });
+  if (!inWindow(store, date, now)) return { error: "UNAVAILABLE" };
   await releaseExpiredHolds(now);
   await ensureBatches(storeId, date, date);
   let prepared;
@@ -159,11 +170,11 @@ async function listDayBatchesTx(tx: Prisma.TransactionClient, storeId: string, d
 }
 
 export async function releaseSessionHolds(tx: Prisma.TransactionClient, sessionId: string) {
-  const holds = await tx.batchHold.findMany({ where: { sessionId } });
+  const holds = await tx.$queryRaw<{ batch_id: string; units: number }[]>`
+    DELETE FROM batch_holds WHERE session_id = ${sessionId} RETURNING batch_id, units`;
   for (const h of holds) {
-    await tx.$executeRaw`UPDATE production_batches SET held_units = held_units - ${h.units} WHERE id = ${h.batchId}`;
+    await tx.$executeRaw`UPDATE production_batches SET held_units = held_units - ${h.units} WHERE id = ${h.batch_id}`;
   }
-  await tx.batchHold.deleteMany({ where: { sessionId } });
 }
 
 /**
@@ -175,12 +186,22 @@ export async function consumeHolds(
   sessionId: string,
   orderItems: { id: string; productId: string; qty: number }[],
   now: Date = new Date(),
+  target?: { date: LocalDate; handoffAt: Date },
 ): Promise<void> {
+  // trava as reservas válidas da sessão: nenhuma outra requisição libera ou consome as mesmas
+  const locked = await tx.$queryRaw<{ id: string }[]>`
+    SELECT id FROM batch_holds WHERE session_id = ${sessionId} AND expires_at > ${now} FOR UPDATE`;
   const holds = await tx.batchHold.findMany({
-    where: { sessionId, expiresAt: { gt: now } },
-    include: { batch: { select: { productId: true, readyAt: true } } },
+    where: { id: { in: locked.map((l) => l.id) } },
+    include: { batch: { select: { productId: true, readyAt: true, date: true } } },
     orderBy: { batch: { readyAt: "desc" } },
   });
+  if (
+    target &&
+    holds.some((h) => h.batch.date.toISOString().slice(0, 10) !== target.date || h.batch.readyAt.getTime() > target.handoffAt.getTime())
+  ) {
+    throw new BookingError("HOLD_EXPIRED");
+  }
   const products = await tx.product.findMany({
     where: { id: { in: [...new Set(orderItems.map((i) => i.productId))] } },
     select: { id: true, productionUnits: true },
