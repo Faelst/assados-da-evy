@@ -72,7 +72,10 @@ function dayStatus(batches: BatchView[], now: Date, lead: Map<string, number>): 
 }
 
 /** Disponibilidade dos próximos dias dentro da janela de agenda. */
-export async function availableDates(storeId: string, now: Date = new Date()): Promise<{ date: LocalDate; status: DateStatus }[]> {
+export async function availableDates(
+  storeId: string,
+  now: Date = new Date(),
+): Promise<{ date: LocalDate; status: DateStatus; products: string[] }[]> {
   const store = await db.store.findUniqueOrThrow({ where: { id: storeId } });
   await releaseExpiredHolds(now);
   const today = todayIn(store.timezone, now);
@@ -80,9 +83,10 @@ export async function availableDates(storeId: string, now: Date = new Date()): P
   await ensureBatches(storeId, today, last);
   const products = await db.product.findMany({ where: { storeId }, select: { id: true, leadTimeHours: true } });
   const lead = new Map(products.map((p) => [p.id, p.leadTimeHours]));
-  const out: { date: LocalDate; status: DateStatus }[] = [];
+  const out: { date: LocalDate; status: DateStatus; products: string[] }[] = [];
   for (let d = today; d <= last; d = addDays(d, 1)) {
-    out.push({ date: d, status: dayStatus(await listDayBatches(storeId, d), now, lead) });
+    const batches = await listDayBatches(storeId, d);
+    out.push({ date: d, status: dayStatus(batches, now, lead), products: [...new Set(batches.map((b) => b.productName))] });
   }
   return out;
 }
