@@ -12,23 +12,29 @@ export function AddToCart({
   date,
   disabled,
   label = "Adicionar",
+  variants = [],
 }: {
   type: "READY" | "SCHEDULED";
   item: Omit<CartItem, "qty">;
   date?: string;
   disabled?: boolean;
   label?: string;
+  variants?: { id: string; name: string; priceDeltaCents: number }[];
 }) {
   const { add, replace, cart } = useCart();
   const router = useRouter();
-  const inCart = cart.items.find((i) => i.productId === item.productId && i.variantId === item.variantId)?.qty ?? 0;
+  const inCart = cart.items.filter((i) => i.productId === item.productId).reduce((sum, i) => sum + i.qty, 0);
   const max = item.max !== undefined ? Math.max(0, item.max - inCart) : undefined;
   const [qty, setQty] = useState(1);
   const [done, setDone] = useState(false);
   const [conflict, setConflict] = useState(false);
+  const [variantId, setVariantId] = useState(variants[0]?.id);
+  const variant = variants.find((v) => v.id === variantId);
 
   function submit(force = false) {
-    const line = { ...item, qty };
+    const line = variant
+      ? { ...item, qty, variantId: variant.id, name: `${item.name} (${variant.name})`, priceCents: item.priceCents + variant.priceDeltaCents }
+      : { ...item, qty };
     if (force) replace(type, line, date);
     else if (!add(type, line, date)) {
       setConflict(true);
@@ -65,6 +71,16 @@ export function AddToCart({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {variants.length > 0 && (
+        <select className="input w-auto py-1.5 text-sm" value={variantId} onChange={(e) => setVariantId(e.target.value)} aria-label="Variação">
+          {variants.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.name}
+              {v.priceDeltaCents ? ` (+${(v.priceDeltaCents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })})` : ""}
+            </option>
+          ))}
+        </select>
+      )}
       <QtyStepper value={qty} onChange={setQty} min={1} max={max} />
       <button type="button" onClick={() => submit()} className="btn-primary px-4 py-2 text-sm">
         {done ? <Check className="size-4" /> : <Plus className="size-4" />} {done ? "Adicionado" : label}

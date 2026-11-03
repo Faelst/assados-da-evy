@@ -50,6 +50,7 @@ export default async function ProntaEntrega() {
                 type="READY"
                 disabled={soldOut}
                 item={{ productId: i.productId, name: i.name, priceCents: i.priceCents, imageUrl: i.imageUrl, max: i.qtyAvailable }}
+                variants={i.variants}
               />
             </ProductCard>
           );

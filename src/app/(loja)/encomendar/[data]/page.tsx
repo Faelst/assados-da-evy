@@ -68,6 +68,7 @@ export default async function DiaEncomenda({ params }: PageProps<"/encomendar/[d
                 date={data}
                 disabled={free <= 0}
                 item={{ productId: p.id, name: p.name, priceCents: p.priceCents, imageUrl: p.imageUrl, max: free }}
+                variants={p.variants.map((v) => ({ id: v.id, name: v.name, priceDeltaCents: v.priceDeltaCents }))}
               />
             </ProductCard>
           );

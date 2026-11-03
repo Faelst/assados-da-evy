@@ -20,6 +20,7 @@ export type TodayMenuItem = {
   imageUrl: string | null;
   qtyAvailable: number;
   paused: boolean;
+  variants: { id: string; name: string; priceDeltaCents: number }[];
 };
 
 /** Cardápio de pronta entrega de hoje. `open` = cozinha aberta agora e cardápio ativo. */
@@ -27,7 +28,7 @@ export async function getTodayMenu(storeId: string, now: Date = new Date()): Pro
   const status = await getStoreStatus(storeId, now);
   const menu = await db.dailyMenu.findUnique({
     where: { storeId_date: { storeId, date: dateColumn(status.today) } },
-    include: { items: { include: { product: true }, orderBy: { product: { sortOrder: "asc" } } } },
+    include: { items: { include: { product: { include: { variants: true } } }, orderBy: { product: { sortOrder: "asc" } } } },
   });
   if (!menu) return null;
   return {
@@ -43,6 +44,7 @@ export async function getTodayMenu(storeId: string, now: Date = new Date()): Pro
         imageUrl: i.product.imageUrl,
         qtyAvailable: i.qtyAvailable,
         paused: i.paused,
+        variants: i.product.variants.map((v) => ({ id: v.id, name: v.name, priceDeltaCents: v.priceDeltaCents })),
       })),
   };
 }

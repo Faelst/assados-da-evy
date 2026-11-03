@@ -47,5 +47,6 @@ data/
 .superpowers/
 
 /src/generated/
-/public/uploads/
 !.env.example
+
+/uploads/
