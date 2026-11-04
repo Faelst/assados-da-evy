@@ -7,12 +7,12 @@ const quicksand = Quicksand({ variable: "--font-quicksand", subsets: ["latin"], 
 const caveat = Caveat({ variable: "--font-caveat", subsets: ["latin"], weight: ["500", "700"] });
 
 export const metadata: Metadata = {
-  title: "Assados da Evy · 1 cadin de tudo · Jacareí/SP",
+  title: "Assados da Evy · Pronta entrega e encomendas · Jacareí/SP",
   description:
-    "Salgados assados, pizza enrolada e assadinhos para eventos em Jacareí/SP. Sabor, qualidade e muito carinho em cada mordida. Faça seu orçamento.",
+    "Peça salgados assados, pizza enrolada e assadinhos da Evy: pronta entrega no dia ou encomenda com horário marcado em Jacareí/SP.",
   openGraph: {
     title: "Assados da Evy · 1 cadin de tudo",
-    description: "Sabor, qualidade e muito carinho em cada mordida. Encomendas e eventos em Jacareí/SP.",
+    description: "Pronta entrega e encomendas com horário marcado em Jacareí/SP.",
     images: ["/img/logo.png"],
     locale: "pt_BR",
     type: "website",
