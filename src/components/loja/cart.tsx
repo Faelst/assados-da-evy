@@ -38,6 +38,8 @@ type CartApi = {
   setHandoff: (at: string | undefined, label: string | undefined) => void;
   clear: () => void;
   replace: (type: "READY" | "SCHEDULED", item: CartItem, date?: string) => void;
+  /** Troca o carrinho inteiro (encomenda montada com itens e horário de uma vez). */
+  load: (cart: Cart) => void;
 };
 
 const CartContext = createContext<CartApi | null>(null);
@@ -112,6 +114,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clear = useCallback(() => setCart(EMPTY), []);
 
+  const load = useCallback((next: Cart) => setCart(next.items.length ? next : EMPTY), []);
+
   const value = useMemo<CartApi>(
     () => ({
       cart,
@@ -124,8 +128,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       setHandoff,
       clear,
       replace,
+      load,
     }),
-    [cart, ready, sessionId, add, setQty, setHandoff, clear, replace],
+    [cart, ready, sessionId, add, setQty, setHandoff, clear, replace, load],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

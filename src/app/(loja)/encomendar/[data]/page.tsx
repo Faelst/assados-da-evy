@@ -6,9 +6,7 @@ import { getStore } from "@/server/store";
 import { ensureBatches, listDayBatches, releaseExpiredHolds } from "@/server/services/batches";
 import { isBookable } from "@/server/domain/allocation";
 import { addDays, todayIn, utcToLocalHHmm, weekdayOf, WEEKDAYS_PT } from "@/server/domain/time";
-import { ProductCard } from "@/components/loja/ProductCard";
-import { AddToCart } from "@/components/loja/AddToCart";
-import { HandoffPicker } from "@/components/loja/HandoffPicker";
+import { ScheduledOrder } from "@/components/loja/ScheduledOrder";
 
 export default async function DiaEncomenda({ params }: PageProps<"/encomendar/[data]">) {
   const { data } = await params;
@@ -42,40 +40,28 @@ export default async function DiaEncomenda({ params }: PageProps<"/encomendar/[d
 
       {products.length === 0 && <p className="card text-center text-ink/70">Não há fornadas nesta data.</p>}
 
-      <div className="grid gap-3 md:grid-cols-2">
-        {products.map((p) => {
+      <ScheduledOrder
+        date={data}
+        products={products.map((p) => {
           const own = batches.filter((b) => b.productId === p.id);
           const bookable = own.filter((b) => isBookable(b, now, p.leadTimeHours));
           const free = Math.floor(bookable.reduce((s, b) => s + b.freeUnits, 0) / p.productionUnits);
           const times = own.map((b) => utcToLocalHHmm(b.readyAt, store.timezone)).join(" · ");
-          return (
-            <ProductCard
-              key={p.id}
-              name={p.name}
-              description={p.description}
-              priceCents={p.priceCents}
-              imageUrl={p.imageUrl}
-              badge={
-                <span className="text-xs font-semibold text-ink/60">
-                  Fica pronto: {times}
-                  {free > 0 ? ` · ${free} disponíveis` : ""}
-                  {p.leadTimeHours > 0 ? ` · pedir com ${p.leadTimeHours}h de antecedência` : ""}
-                </span>
-              }
-            >
-              <AddToCart
-                type="SCHEDULED"
-                date={data}
-                disabled={free <= 0}
-                item={{ productId: p.id, name: p.name, priceCents: p.priceCents, imageUrl: p.imageUrl, max: free }}
-                variants={p.variants.map((v) => ({ id: v.id, name: v.name, priceDeltaCents: v.priceDeltaCents }))}
-              />
-            </ProductCard>
-          );
+          return {
+            id: p.id,
+            name: p.name,
+            description: p.description,
+            priceCents: p.priceCents,
+            imageUrl: p.imageUrl,
+            free,
+            badge:
+              `Fica pronto: ${times}` +
+              (free > 0 ? ` · ${free} disponíveis` : "") +
+              (p.leadTimeHours > 0 ? ` · pedir com ${p.leadTimeHours}h de antecedência` : ""),
+            variants: p.variants.map((v) => ({ id: v.id, name: v.name, priceDeltaCents: v.priceDeltaCents })),
+          };
         })}
-      </div>
-
-      <HandoffPicker date={data} />
+      />
     </div>
   );
 }

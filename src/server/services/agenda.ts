@@ -123,3 +123,33 @@ export async function productionDay(storeId: string, date: LocalDate): Promise<P
   }
   return [...lines.values()];
 }
+
+/** Uma fornada com todos os pedidos dela, completos (para o painel da agenda). */
+export async function batchDetail(storeId: string, batchId: string) {
+  const batch = await db.productionBatch.findFirst({
+    where: { id: batchId, storeId },
+    include: { product: { select: { name: true } }, store: { select: { timezone: true } } },
+  });
+  if (!batch) return null;
+  const orders = await db.order.findMany({
+    where: { storeId, status: { not: "CANCELLED" }, items: { some: { batches: { some: { batchId } } } } },
+    include: {
+      customer: true,
+      items: { include: { batches: { where: { batchId }, select: { units: true } } } },
+    },
+    orderBy: [{ handoffAt: "asc" }, { createdAt: "asc" }],
+  });
+  const tz = batch.store.timezone;
+  return {
+    id: batch.id,
+    date: fromDateColumn(batch.date),
+    productName: batch.product.name,
+    start: utcToLocalHHmm(batch.startsAt, tz),
+    end: utcToLocalHHmm(batch.readyAt, tz),
+    usedUnits: batch.usedUnits,
+    capacityUnits: batch.capacityUnits,
+    blocked: batch.blocked,
+    timezone: tz,
+    orders,
+  };
+}

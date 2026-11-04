@@ -2,44 +2,39 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { requireSection } from "@/server/auth";
 import { getStore } from "@/server/store";
-import { weekAgenda, weekStartOf, type AgendaBatch } from "@/server/services/agenda";
+import { batchDetail, weekAgenda, weekStartOf, type AgendaBatch } from "@/server/services/agenda";
 import { addDays, minutesOf, todayIn, weekdayOf, WEEKDAYS_PT } from "@/server/domain/time";
 import { PageHeader } from "@/components/admin/PageHeader";
-import { StatusBadge } from "@/components/admin/StatusBadge";
+import { BatchOrdersPanel } from "@/components/admin/BatchOrdersPanel";
 import { ProductionTabs } from "@/components/admin/ProductionTabs";
 
 const HOUR_PX = 64;
 
-function BatchCard({ b, compact }: { b: AgendaBatch; compact?: boolean }) {
+function BatchCard({ b, href, compact }: { b: AgendaBatch; href: string; compact?: boolean }) {
   const pct = Math.min(100, Math.round(((b.usedUnits + b.heldUnits) / b.capacityUnits) * 100));
   return (
-    <details className={`group h-full overflow-hidden rounded-xl border bg-white text-left shadow-sm open:z-20 open:h-auto open:shadow-xl ${b.blocked ? "border-ink/20 opacity-60" : "border-terracotta/30"}`}>
-      <summary className="cursor-pointer list-none p-2">
-        <p className="truncate text-xs font-bold text-terracotta-dark">{b.productName}</p>
-        <p className="text-[11px] text-ink/60">
-          {b.start}–{b.end} {b.blocked && "· bloqueada"}
+    <Link
+      href={href}
+      scroll={false}
+      title="Ver os pedidos desta fornada"
+      className={`block h-full overflow-hidden rounded-xl border bg-white p-2 text-left shadow-sm transition hover:shadow-md hover:ring-2 hover:ring-terracotta/30 ${b.blocked ? "border-ink/20 opacity-60" : "border-terracotta/30"}`}
+    >
+      <p className="truncate text-xs font-bold text-terracotta-dark">{b.productName}</p>
+      <p className="text-[11px] text-ink/60">
+        {b.start}–{b.end} {b.blocked && "· bloqueada"}
+      </p>
+      <div className="mt-1 flex items-center gap-1.5">
+        <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-cream-deep">
+          <span className="block h-full bg-terracotta" style={{ width: `${pct}%` }} />
+        </span>
+        <span className="text-[11px] font-bold tabular-nums">{b.usedUnits}/{b.capacityUnits}</span>
+      </div>
+      {b.orders.length > 0 && (
+        <p className="mt-1 truncate text-[11px] font-semibold text-ink/70">
+          {b.orders.length} pedido(s){compact ? ` · ${b.orders.map((o) => o.customer).join(", ")}` : ""}
         </p>
-        <div className="mt-1 flex items-center gap-1.5">
-          <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-cream-deep">
-            <span className="block h-full bg-terracotta" style={{ width: `${pct}%` }} />
-          </span>
-          <span className="text-[11px] font-bold tabular-nums">{b.usedUnits}/{b.capacityUnits}</span>
-        </div>
-        {!compact && b.orders.length > 0 && <p className="mt-1 text-[11px] font-semibold text-ink/70">{b.orders.length} pedido(s)</p>}
-      </summary>
-      <ul className="space-y-1.5 border-t border-terracotta/10 p-2">
-        {b.orders.length === 0 && <li className="text-xs text-ink/50">Sem pedidos.</li>}
-        {b.orders.map((o) => (
-          <li key={o.orderId}>
-            <Link href={`/admin/pedidos/${o.orderId}`} className="block rounded-lg p-1 text-xs hover:bg-cream">
-              <span className="font-bold">{o.code}</span> · {o.customer}
-              <span className="block text-ink/60">{o.items} · {o.fulfillment === "DELIVERY" ? "Entrega" : "Retirada"}</span>
-              <StatusBadge status={o.status} />
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </details>
+      )}
+    </Link>
   );
 }
 
@@ -51,6 +46,9 @@ export default async function Agenda({ searchParams }: PageProps<"/admin/agenda"
   const ref = typeof sp.semana === "string" && /^\d{4}-\d{2}-\d{2}$/.test(sp.semana) ? sp.semana : today;
   const start = weekStartOf(ref);
   const days = await weekAgenda(store.id, start);
+  const weekHref = ref === today ? "/admin/agenda" : `/admin/agenda?semana=${ref}`;
+  const batchHref = (id: string) => `/admin/agenda?${new URLSearchParams({ ...(ref !== today && { semana: ref }), fornada: id })}`;
+  const opened = typeof sp.fornada === "string" ? await batchDetail(store.id, sp.fornada) : null;
 
   const all = days.flatMap((d) => d.batches);
   const minHour = Math.min(8, ...all.map((b) => Math.floor(minutesOf(b.start) / 60)));
@@ -63,7 +61,7 @@ export default async function Agenda({ searchParams }: PageProps<"/admin/agenda"
       <ProductionTabs active="semana" date={ref} role={session.role} />
       <PageHeader
         title="Agenda da semana"
-        subtitle={`${label(start)} a ${label(addDays(start, 6))} · toque numa fornada para ver os pedidos, ou no dia para ajustar`}
+        subtitle={`${label(start)} a ${label(addDays(start, 6))} · toque numa fornada para ver todos os pedidos dela, ou no dia para ajustar`}
         actions={
           <>
             <Link href={`/admin/agenda?semana=${addDays(start, -7)}`} className="btn-secondary px-3" aria-label="Semana anterior"><ChevronLeft className="size-4" /></Link>
@@ -110,10 +108,10 @@ export default async function Agenda({ searchParams }: PageProps<"/admin/agenda"
                 return (
                   <div
                     key={b.id ?? idx}
-                    className="absolute h-(--h) p-0.5 has-[details[open]]:z-30 has-[details[open]]:h-auto has-[details[open]]:min-h-(--h)"
-                    style={{ top, left: `${col * width}%`, width: `${width}%`, ["--h" as string]: `${height}px` }}
+                    className="absolute p-0.5"
+                    style={{ top, left: `${col * width}%`, width: `${width}%`, height }}
                   >
-                    <BatchCard b={b} />
+                    <BatchCard b={b} href={batchHref(b.id)} />
                   </div>
                 );
               })}
@@ -134,12 +132,14 @@ export default async function Agenda({ searchParams }: PageProps<"/admin/agenda"
               <p className="text-sm text-ink/50">Sem fornadas.</p>
             ) : (
               <div className="space-y-2">
-                {d.batches.map((b) => <BatchCard key={b.id} b={b} compact />)}
+                {d.batches.map((b) => <BatchCard key={b.id} b={b} href={batchHref(b.id)} compact />)}
               </div>
             )}
           </section>
         ))}
       </div>
+
+      {opened && <BatchOrdersPanel batch={opened} closeHref={weekHref} role={session.role} />}
     </>
   );
 }
